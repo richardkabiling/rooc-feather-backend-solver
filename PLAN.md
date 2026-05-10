@@ -169,7 +169,8 @@ domain/
 eval/
   feather_table.rs               [feather][tier] -> StatVec, cumulative cost
   set_bonus_table.rs             [tier] -> (AttackSetBonus | DefenseSetBonus); category masks
-  evaluator.rs                   statue_score, solution_score (hot path)
+  normalizer.rs                  compute_norm_factors(); effective_weights()
+  evaluator.rs                   statue_score, solution_score (hot path); stores eff_weights
 solver/
   mod.rs                         pub trait Solver, SolveContext, SolverConfig, SolverEvent, ProgressTx
   common/
@@ -223,6 +224,61 @@ optional = true
 
 ---
 
+## Stat normalization
+
+Stats have a 567× scale range across feathers at T20:
+
+| StatId | T20 max (per feather) |
+|--------|----------------------|
+| PDMG, MDMG, PDMGReduction, MDMGReduction | 1.8 |
+| IntDexStr, VIT | 7 |
+| PATK, MATK | 66 |
+| IgnoreMDEF | 41 |
+| PvPDmgBonus, PvPDmgReduction | 115 |
+| PvEDmgBonus, PvEDmgReduction | 150 |
+| IgnorePDEF | 164 |
+| HP | 1020 |
+
+Without normalization, the optimizer de-facto ignores low-scale stats regardless of their preset weight: a weight of 3 on PDMG (max 1.8 per feather) contributes at most 5.4 per slot, while a weight of 2 on HP (max 1020) contributes up to 2040. Preset weights therefore cannot meaningfully express relative priority in raw-value space.
+
+**Normalization factors** (`NormFactors: StatVec`) are computed once from the feather table:
+
+```rust
+// src/eval/normalizer.rs
+pub fn compute_norm_factors(feather_table: &FeatherTable) -> StatVec {
+    let mut norm = StatVec::zero();
+    for feather in feather_table.all() {
+        let t20 = feather.stats_at(Tier::MAX);   // tier-20 row
+        for i in 0..17 {
+            norm[i] = norm[i].max(t20[i]);
+        }
+    }
+    for i in 0..17 {
+        if norm[i] == 0.0 { norm[i] = 1.0; }   // guard: stat absent from all feathers
+    }
+    norm
+}
+```
+
+**Effective weights** are precomputed once per `(Preset, NormFactors)` pair and stored in `Evaluator`:
+
+```rust
+// effective_weights[i] = preset.weights[i] / norm[i]
+pub fn effective_weights(weights: &StatVec, norm: &StatVec) -> StatVec {
+    let mut ew = *weights;
+    for i in 0..17 { ew[i] /= norm[i]; }
+    ew
+}
+```
+
+The evaluator dot-product step (step 5) uses `eff_weights` instead of raw `preset.weights`. The hot path is unchanged — still a single dot product.
+
+> **Preset weight semantics**: weights in `data/presets.csv` express priority **per unit of normalized stat value** (i.e., per percentage-of-T20-maximum). A weight of 4 on PvEDmgBonus and 3 on PDMG means the optimizer values 4% of max PvEDmgBonus (= 6.0 raw) the same as 3% of max PDMG (= 0.054 raw). Preset authors write weights in normalized space and do not need to know raw stat magnitudes.
+
+> **Norm factors include only feather contributions**, not set bonus flats (PATK/MATK/HP/etc.). The set bonus flats are typically 30–78 (attack) or 110–1320 (HP defense) at T20 and land in stat slots that are already normalized. The approximation is acceptable; exact per-statue normalization would require solving a sub-problem.
+
+---
+
 ## Domain & evaluator design (the math has to be right)
 - `Tier(u8)` newtype enforced 1..=20 at construction.
 - `StatVec = [f64; 17]` indexed by compile-time `StatId`. Stat math is fused-multiply-add over the 17 lanes — far faster than `HashMap` and `Copy`.
@@ -233,8 +289,8 @@ optional = true
   2. find `min_tier`,
   3. lookup `(pct, flat)` from the appropriate bonus table at `min_tier - 1`,
   4. `final[i] = raw[i] * (1.0 + pct[i]/100.0) + flat[i]`,
-  5. dot-product with `preset.weights`.
-- Optional micro-opt: pre-fold preset weights into the per-tier bonus tables so step 5 collapses into step 4. Apply only after correctness is verified.
+  5. dot-product with `eff_weights` (normalized preset weights, precomputed at startup).
+- Optional micro-opt: pre-fold `eff_weights` into the per-tier bonus tables so step 5 collapses into step 4. Apply only after correctness is verified.
 
 ---
 
@@ -318,6 +374,8 @@ Event loop: `crossterm` polls keys; solver thread sends `SolverEvent`s via chann
 - **`PvP DMG Bonus`** exists both as a feather stat and as a flat set-bonus — they aggregate, must not overwrite.
 - **Sparse stat columns**: parse as `Option<f64>`, then `unwrap_or(0.0)` into the dense `StatVec`.
 - **Higher-tier inventory rows**: a row `Space, 5, 10` contributes `10 * (1 + TotalCost(5))` = `10 × 38 = 380` T1-equivalent units to the STDN pool — applied at load time.
+- **Norm factors from feathers only**: `compute_norm_factors` scans the feather table, not set bonus tables. Set bonus flat values (e.g. HP bonus up to 1320 at T20 for defense) are not reflected in norm factors. This is acceptable — norm factors are an approximation, and set bonus contributions land in the same stat slots which are already normalized by the feather-derived factor.
+- **Zero-stat guard in normalizer**: `IntDexStr` and `VIT` only appear on two feathers (Stats/Virtue). If a future feather table has a stat entirely absent, `norm[i]` would be 0 → division by zero. Guard: `if norm[i] == 0.0 { norm[i] = 1.0 }`.
 - **Missing feather types**: `input.csv` has only 6 of 18 feather types. Missing types contribute 0 to pool but can be placed if the set pool has budget. The eligible-feather list must include all feathers of the correct type/rarity/statue-kind whose set pool is non-zero.
 
 ---
@@ -326,7 +384,7 @@ Event loop: `crossterm` polls keys; solver thread sends `SolverEvent`s via chann
 1. **`Cargo.toml`**: add all dependencies, feature flags.
 2. **`data/`** + CSV loaders + parsing tests. Unit tests: parse all CSVs without panic; verify row counts.
 3. **`domain/`**: `StatId` enum (17 variants), `StatVec=[f64;17]`, `Tier(u8)`, `Set` enum, `FeatherDef`, `Statue`, `Inventory`. Unit tests: tier construction panics on 0; inventory consume/restore.
-4. **`eval/`** + golden unit tests (lock the math first).
+4. **`eval/`**: `feather_table.rs`, `set_bonus_table.rs`, `normalizer.rs` (norm factors + effective weights), `evaluator.rs`. Golden unit tests lock the math before solvers touch it.
 5. **`solver/common/repair.rs`** + neighborhood primitives + their tests.
 6. **`solver/sa.rs`** single-threaded, then add rayon multi-start.
 7. TUI shell with mocked `SolverEvent`s; wire SA.
@@ -343,6 +401,8 @@ Event loop: `crossterm` polls keys; solver thread sends `SolverEvent`s via chann
   - `flat_added_after_pct` — fixed raw + 50% pct + flat 100; assert `raw*1.5 + 100`.
   - `cost_consumption_t1_equiv` — one T5 Space slot consumes `1 + TotalCost(5) = 1 + 37 = 38` from STDN budget.
   - `fractional_stat_parse` — Light T1 PDMG = 0.28 (not truncated to 0).
+  - `norm_factors_correct` — norm[PDMG]=1.8, norm[HP]=1020.0, norm[IgnorePDEF]=164.0; guard zero → 1.0.
+  - `effective_weights_scale_independent` — two presets with identical normalized weights but different raw values produce identical `eff_weights`; optimizer sees no difference.
 - **Property tests** (proptest): random legal solutions never exceed inventory; `greedy_consume` always satisfies the fully-consumed constraint.
 - **Golden file**: `tests/fixtures/tiny_inventory.csv` + expected solver output JSON, pinned by seed.
 - **Cross-solver agreement**: shrink inventory so Stage-1 enumeration is feasible (~10⁴ nodes); BnB returns optimum; SA with 32 restarts × 30s reaches within 1% on 5/5 runs.
@@ -354,7 +414,8 @@ Event loop: `crossterm` polls keys; solver thread sends `SolverEvent`s via chann
 - `src/domain/stats.rs` — `StatId` enum (17 variants) and `StatVec=[f64;17]`; any error here corrupts everything downstream
 - `src/domain/feather.rs` — type/rarity/set enums and per-statue legality predicates
 - `src/eval/set_bonus_table.rs` — two separate table types for attack vs defense; category-to-percentage mapping
-- `src/eval/evaluator.rs` — the hot path; scale-then-add order is paramount
+- `src/eval/normalizer.rs` — norm factors and effective weights; errors here silently distort all objective comparisons
+- `src/eval/evaluator.rs` — the hot path; scale-then-add order and normalized dot-product are both paramount
 - `src/solver/common/repair.rs` — guarantees the "budget fully consumed" hard constraint
 - `src/solver/sa.rs` — Solver A
 - `src/solver/bnb.rs` (+ `bnb_lp.rs`) — Solver B
