@@ -314,6 +314,7 @@ fn draw_results(f: &mut Frame, app: &App, area: Rect) {
 fn save_solution(sol: &Solution) -> anyhow::Result<()> {
     use std::fs::File;
     use std::io::Write;
+    use crate::domain::statue::StatueKind;
 
     let mut out = String::new();
     out.push_str(&format!("Total objective: {:.4}\n\n", sol.objective));
@@ -325,5 +326,23 @@ fn save_solution(sol: &Solution) -> anyhow::Result<()> {
     }
     let mut f = File::create("best_solution.txt")?;
     f.write_all(out.as_bytes())?;
+
+    // Build JSON output
+    let mut attack: Vec<serde_json::Value> = Vec::new();
+    let mut defense: Vec<serde_json::Value> = Vec::new();
+    for statue in &sol.statues {
+        let slots: Vec<serde_json::Value> = statue.slots.iter().map(|s| {
+            serde_json::json!([format!("{:?}", s.feather), s.tier.get() as u32])
+        }).collect();
+        let val = serde_json::Value::Array(slots);
+        match statue.kind {
+            StatueKind::Attack  => attack.push(val),
+            StatueKind::Defense => defense.push(val),
+        }
+    }
+    let json = serde_json::json!({ "attack": attack, "defense": defense });
+    let mut jf = File::create("best_solution.json")?;
+    jf.write_all(serde_json::to_string_pretty(&json)?.as_bytes())?;
+
     Ok(())
 }
