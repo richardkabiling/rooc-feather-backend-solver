@@ -29,3 +29,11 @@ defensive_pvp,PDEF,3
 defensive_pvp,MDEF,3
 defensive_pvp,HP,2
 defensive_pvp,VIT,1
+custom_offensive_pvp,PvPDmgBonus,6
+custom_offensive_pvp,PDMG,5
+custom_offensive_pvp,MDMG,5
+custom_offensive_pvp,IgnorePDEF,5
+custom_offensive_pvp,IgnoreMDEF,5
+custom_offensive_pvp,PATK,3
+custom_offensive_pvp,MATK,3
+custom_offensive_pvp,INTDEXSTR,1
