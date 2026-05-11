@@ -74,7 +74,7 @@ pub fn load_feathers(path: &Path) -> Result<Vec<FeatherDef>> {
             let idx = (row.tier - 1) as usize;
             stats[idx] = feather_row_to_stat_vec(row);
             let tc = row.total_cost.unwrap_or(0);
-            t1_cost[idx] = 1 + tc;
+            t1_cost[idx] = tc;
             upgrade_cost[idx] = row.cost_to_next.unwrap_or(0);
         }
 

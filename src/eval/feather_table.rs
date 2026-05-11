@@ -3,6 +3,7 @@ use crate::domain::feather::{FeatherId, FeatherDef, Tier};
 use crate::domain::stats::{StatVec, StatVecExt};
 
 /// Dense lookup table: feather → tier → StatVec and costs.
+#[derive(Clone)]
 pub struct FeatherTable {
     /// Indexed by FeatherId (via HashMap for flexibility).
     defs: HashMap<FeatherId, FeatherDef>,

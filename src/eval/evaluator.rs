@@ -5,6 +5,7 @@ use crate::eval::feather_table::FeatherTable;
 use crate::eval::set_bonus_table::{AttackSetBonus, DefenseSetBonus};
 
 /// The hot-path evaluator. Holds precomputed tables and effective weights.
+#[derive(Clone)]
 pub struct Evaluator {
     pub feather_table:   FeatherTable,
     pub attack_bonuses:  [AttackSetBonus; 20],

@@ -15,8 +15,8 @@ pub type ProgressTx = Sender<SolverEvent>;
 
 #[derive(Debug, Clone)]
 pub enum SolverEvent {
-    Progress { iter: u64, best_obj: f64, budget_used: [u64; 5] },
-    NewBest(Box<Solution>),
+    Progress { chain: usize, iter: u64, best_obj: f64, iters_since_best: u64, budget_used: [u64; 5] },
+    NewBest(usize, Box<Solution>),
     Done(Box<Solution>),
 }
 
@@ -26,6 +26,9 @@ pub struct SolverConfig {
     pub seed:             u64,
     pub restarts:         usize,
     pub threads:          usize,
+    pub log_every:        u64,
+    /// How often (in SA iterations per chain) to share the best solution across chains.
+    pub share_interval:   u64,
 }
 
 impl Default for SolverConfig {
@@ -35,6 +38,8 @@ impl Default for SolverConfig {
             seed:             42,
             restarts:         8,
             threads:          4,
+            log_every:        10_000,
+            share_interval:   50_000,
         }
     }
 }
