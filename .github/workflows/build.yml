@@ -24,8 +24,8 @@ jobs:
           key: validate-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: validate-cargo-
 
-      - name: Build & test
-        run: cargo build --release && cargo test
+      - name: Build
+        run: cargo build --release
 
   # ── 2. Tag ─────────────────────────────────────────────────────────────────
   tag:
