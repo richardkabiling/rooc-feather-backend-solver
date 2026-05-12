@@ -2,7 +2,7 @@
 
 ## Download
 
-Pre-built binaries are available from the [latest release](../../releases/latest). Download the asset for your platform:
+Pre-built binaries are available from the [latest release](https://github.com/richardkabiling/rooc-feather-backend-solver/releases/tag/v0.0.2). Download the asset for your platform:
 
 | Asset | Platform |
 |-------|----------|
