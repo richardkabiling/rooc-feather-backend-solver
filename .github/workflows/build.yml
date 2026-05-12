@@ -1,10 +1,9 @@
-name: Build
+name: Build & Release
 
 on:
   push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
+    tags:
+      - 'v*'
 
 jobs:
   build:
@@ -14,15 +13,19 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact: rooc-feather-solver-linux-x86_64
+            binary: rooc-feather-solver
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact: rooc-feather-solver-macos-x86_64
+            binary: rooc-feather-solver
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact: rooc-feather-solver-macos-arm64
+            binary: rooc-feather-solver
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact: rooc-feather-solver-windows-x86_64
+            binary: rooc-feather-solver.exe
 
     runs-on: ${{ matrix.os }}
 
@@ -48,16 +51,48 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Upload artifact (Unix)
-        if: runner.os != 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: target/${{ matrix.target }}/release/rooc-feather-solver
+      - name: Rename binary
+        shell: bash
+        run: |
+          src="target/${{ matrix.target }}/release/${{ matrix.binary }}"
+          dst="${{ matrix.artifact }}"
+          [[ "${{ matrix.binary }}" == *.exe ]] && dst="${dst}.exe"
+          cp "$src" "$dst"
 
-      - name: Upload artifact (Windows)
-        if: runner.os == 'Windows'
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: target/${{ matrix.target }}/release/rooc-feather-solver.exe
+          path: ${{ matrix.artifact }}*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+
+      - name: Update README download link
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          REPO="${GITHUB_REPOSITORY}"
+          sed -i "s|\[latest release\](.*)|[latest release](https://github.com/${REPO}/releases/tag/${TAG})|g" README.md
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git diff --cached --quiet || git commit -m "docs: update release link to ${TAG} [skip ci]"
+          git push origin HEAD:main

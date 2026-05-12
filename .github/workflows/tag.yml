@@ -1,0 +1,55 @@
+name: Auto-tag
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump version and push tag
+        run: |
+          # Find the latest semver tag; default to v0.0.0 if none exists.
+          LATEST=$(git tag --list 'v*' --sort=-version:refname | head -1)
+          if [[ -z "$LATEST" ]]; then
+            LATEST="v0.0.0"
+          fi
+
+          # Collect commit messages since the last tag.
+          COMMITS=$(git log "${LATEST}..HEAD" --format="%s %b")
+
+          # Determine bump level from Conventional Commits.
+          BUMP="patch"
+          if echo "$COMMITS" | grep -qE '(^|\n)(BREAKING CHANGE|[a-z]+!:)'; then
+            BUMP="major"
+          elif echo "$COMMITS" | grep -qE '(^|\n)feat[^!]*:'; then
+            BUMP="minor"
+          fi
+
+          # Strip the leading 'v' and split into components.
+          VERSION="${LATEST#v}"
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          MINOR=$(echo "$VERSION" | cut -d. -f2)
+          PATCH=$(echo "$VERSION" | cut -d. -f3)
+
+          if [[ "$BUMP" == "major" ]]; then
+            NEW_TAG="v$((MAJOR + 1)).0.0"
+          elif [[ "$BUMP" == "minor" ]]; then
+            NEW_TAG="v${MAJOR}.$((MINOR + 1)).0"
+          else
+            NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$NEW_TAG"
+          git push origin "$NEW_TAG"
+          echo "Bumped $BUMP: $LATEST → $NEW_TAG"

@@ -1,3 +1,36 @@
+# Commit Conventions
+
+All commits must follow **Conventional Commits** format:
+
+```
+<type>[!]: <description>
+```
+
+| Type | Semver bump | When to use |
+|------|-------------|-------------|
+| `fix` | patch | Bug fix |
+| `chore` | patch | Maintenance, deps, tooling |
+| `refactor` | patch | Code restructure, no behaviour change |
+| `perf` | patch | Performance improvement |
+| `docs` | patch | Documentation only |
+| `test` | patch | Tests only |
+| `feat` | minor | New feature, backwards-compatible |
+| `feat!` or any `!` suffix | major | Breaking change |
+
+Examples:
+```
+fix: correct t1_cost double-count in inventory loader
+feat: add cross-chain solution sharing
+feat!: change JSON output schema to include statue scores
+```
+
+The CI auto-tag workflow reads the commits since the last tag and applies the **highest** bump found:
+- Any `!` suffix or `BREAKING CHANGE` in the body → major
+- Any `feat` → minor
+- Anything else → patch
+
+---
+
 # Setup Rules
 
 ## Statues

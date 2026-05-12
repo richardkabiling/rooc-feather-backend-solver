@@ -2,14 +2,14 @@
 
 ## Download
 
-Pre-built binaries are available from the [Actions](../../actions/workflows/build.yml) tab. Pick the latest successful run on `main` and download the artifact for your platform:
+Pre-built binaries are available from the [latest release](../../releases/latest). Download the asset for your platform:
 
-| Artifact | Platform |
-|----------|----------|
+| Asset | Platform |
+|-------|----------|
 | `rooc-feather-solver-linux-x86_64` | Linux (x86-64) |
 | `rooc-feather-solver-macos-x86_64` | macOS (Intel) |
 | `rooc-feather-solver-macos-arm64`  | macOS (Apple Silicon) |
-| `rooc-feather-solver-windows-x86_64` | Windows (x86-64) |
+| `rooc-feather-solver-windows-x86_64.exe` | Windows (x86-64) |
 
 On Linux/macOS, make the binary executable after downloading:
 
