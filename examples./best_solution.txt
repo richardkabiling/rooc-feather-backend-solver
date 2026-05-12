@@ -1,0 +1,62 @@
+Total objective: 116.9747
+
+Statue 1 (Attack): score=17.5414
+  Light T9
+  Space T9
+  Time T9
+  Sky T11
+  Stats T9
+Statue 2 (Attack): score=17.3802
+  Light T10
+  Space T10
+  Sky T11
+  Day T10
+  Stats T10
+Statue 3 (Attack): score=16.8580
+  Space T11
+  Time T11
+  Sky T13
+  Stats T13
+  Day T11
+Statue 4 (Attack): score=16.5293
+  Light T8
+  Space T9
+  Time T9
+  Sky T10
+  Stats T9
+Statue 5 (Attack): score=13.7522
+  Space T9
+  Light T5
+  Dark T5
+  Sky T10
+  Stats T9
+Statue 6 (Defense): score=7.7657
+  Light T4
+  Dark T4
+  Night T10
+  Divine T5
+  Justice T15
+Statue 7 (Defense): score=7.5810
+  Light T4
+  Dark T4
+  Divine T6
+  Justice T15
+  Nature T4
+Statue 8 (Defense): score=7.5482
+  Light T4
+  Dark T4
+  Night T10
+  Justice T14
+  Divine T4
+Statue 9 (Defense): score=6.4719
+  Light T3
+  Dark T3
+  Night T10
+  Divine T4
+  Justice T10
+Statue 10 (Defense): score=5.5467
+  Light T2
+  Dark T2
+  Night T10
+  Divine T4
+  Justice T10
