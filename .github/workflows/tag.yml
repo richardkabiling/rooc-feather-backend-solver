@@ -17,14 +17,16 @@ jobs:
 
       - name: Bump version and push tag
         run: |
-          # Find the latest semver tag; default to v0.0.0 if none exists.
+          # Find the latest semver tag.
           LATEST=$(git tag --list 'v*' --sort=-version:refname | head -1)
-          if [[ -z "$LATEST" ]]; then
-            LATEST="v0.0.0"
-          fi
 
-          # Collect commit messages since the last tag.
-          COMMITS=$(git log "${LATEST}..HEAD" --format="%s %b")
+          # Collect commit messages since the last tag (or all commits if no tag exists).
+          if [[ -z "$LATEST" ]]; then
+            COMMITS=$(git log HEAD --format="%s %b")
+            LATEST="v0.0.0"
+          else
+            COMMITS=$(git log "${LATEST}..HEAD" --format="%s %b")
+          fi
 
           # Determine bump level from Conventional Commits.
           BUMP="patch"
